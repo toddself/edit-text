@@ -32,7 +32,8 @@ body {
     display: flex;
     flex-direction: row;
     background: #ddd;
-    border-bottom: 2px solid #aaa;
+    border-bottom: 1px solid #aaa;
+    box-shadow: 0 1px 3px #ddd;
     padding: 5px 20px 8px;
     cursor: auto;
     min-height: 44px;
@@ -59,7 +60,7 @@ body {
             font-weight: bold;
             border-radius: 4px;
             font-size: 10px;
-            margin-left: 10px;
+            margin-left: 8px;
             padding: 4px 5px 3px;
 
         }
@@ -198,6 +199,7 @@ body.theme-column .edit-text {
     background: #fff;
     border: 1px solid #ccc;
     box-shadow: 3px 3px 7px #bbb;
+    min-height: 93%;
 }
 
 .edit-text {
