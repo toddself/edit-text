@@ -172,7 +172,7 @@ class LocalButtons extends React.Component {
   render(): React.ReactNode {
     return (
       <div className="menu-buttongroup" style={{marginRight: 0}}>
-        <button onClick={() => this.onMarkdownClick()}>Load/Save</button>
+        <button onClick={() => this.onMarkdownClick()}>IMPORT/EXPORT</button>
 
         <button id="width" onClick={() => this.toggleWidth()}>Page Width</button>
 
@@ -438,7 +438,7 @@ export function start() {
       if (!sessionStorage.getItem("its-only-funny-once")) {
         editorFrame.showNotification({
           element: (<div>
-            Check out <a href="http://github.com/tcr/edit-text">edit-text</a> on Github for more information.
+            Check out <a href="http://github.com/tcr/edit-text">http://github.com/tcr/edit-text</a> for reporting issues or getting started docs.
           </div>),
           level: 'notice',
         });
