@@ -19,6 +19,10 @@ use std::{
         Arc,
     },
 };
+use core::{
+    str::next_code_point,
+    char,
+};
 
 #[repr(u8)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -42,7 +46,7 @@ pub type StyleSet = HashSet<Style>;
 /// Abstraction for String that allows a limited set of operations
 /// with good optimization. (Or that's the idea.)
 #[derive(Clone, Debug)]
-pub struct DocString(Arc<String>, Option<Range<usize>>, Option<Arc<StyleMap>>);
+pub struct DocString(Arc<String>, pub Option<Range<usize>>, Option<Arc<StyleMap>>);
 
 impl DocString {
     pub fn from_string(input: String) -> DocString {
@@ -104,20 +108,27 @@ impl DocString {
         self.1 = None;
     }
 
+    #[inline(never)]
+    #[no_mangle]
+    pub fn slice_inner(s: &str, b: usize) -> usize {
+        let mut iter = s.as_bytes().iter();
+        for _ in 0..b {
+            next_code_point(&mut iter);
+        }
+        s.len() - iter.as_slice().len()
+    }
+
     // TODO consume self?
     pub fn split_at(&self, char_boundary: usize) -> (DocString, DocString) {
-        let (byte_index, _) = self
-            .as_str()
-            .char_indices()
-            .skip(char_boundary)
-            .next()
-            .unwrap();
         let mut start = 0;
         let mut end = self.0.len();
         if let Some(ref range) = self.1 {
             start = range.start;
             end = range.end;
         }
+
+        let byte_index = DocString::slice_inner(&self.0[start..], char_boundary);
+
         (
             DocString(
                 self.0.clone(),
@@ -130,6 +141,33 @@ impl DocString {
                 self.2.clone(),
             ),
         )
+    }
+
+    pub unsafe fn seek_forward(&mut self, add: usize) {
+        let mut start = 0;
+        let mut end = self.0.len();
+        if let Some(ref range) = self.1 {
+            start = range.start;
+            end = range.end;
+        }
+        self.1 = Some(start + add..end); //TODO do not land with this, not utf-8 safe
+    }
+
+    pub unsafe fn seek_backward(&mut self, sub: usize) {
+        let mut start = 0;
+        let mut end = self.0.len();
+        if let Some(ref range) = self.1 {
+            start = range.start;
+            end = range.end;
+        }
+        self.1 = Some(start - sub..end); //TODO do not land with this, not utf-8 safe
+    }
+
+    pub unsafe fn byte_range_mut(&mut self) -> &mut Range<usize> {
+        if self.1.is_none() {
+            self.1 = Some(0..(self.0.len()));
+        }
+        self.1.as_mut().unwrap()
     }
 
     pub fn to_string(&self) -> String {
@@ -213,5 +251,111 @@ impl<'de> Deserialize<'de> for DocString {
 
         const FIELDS: &'static [&'static str] = &["docstring"];
         deserializer.deserialize_any(FieldVisitor)
+    }
+}
+
+#[derive(Debug)]
+struct DividedString {
+    original_range: Range<usize>,
+    left_string: DocString,
+    right_string: DocString,
+    index: usize,
+}
+
+impl DividedString {
+    fn new(input: DocString, index: usize) -> DividedString {
+        let char_len = input.char_len();
+        if index > char_len - 1 {
+            panic!("Invalid index to DividedString");
+        }
+        DividedString {
+            original_range: input.1.clone().unwrap_or_else(|| (0..char_len)),
+            left_string: input.clone(),
+            right_string: input,
+            index: index,
+        }
+    }
+
+    fn seek(&mut self, index: isize) {
+        if (self.index as isize) + index < 0 {
+            panic!("Moved before start of string");
+        }
+        self.index = ((self.index as isize) + index) as usize;
+        if self.index > self.original_range.len() {
+            panic!("Moved beyond end of string");
+        }
+    }
+
+    fn update_left(&mut self) {
+        let mut range = self.original_range.clone();
+        range.start += self.index;
+        self.left_string.1 = Some(range);
+    }
+
+    pub fn left<'a>(&'a mut self) -> Option<&'a DocString> {
+        if self.index == 0 {
+            None
+        } else {
+            self.update_left();
+            Some(&self.left_string)
+        }
+    }
+
+    fn update_right(&mut self) {
+        let mut range = self.original_range.clone();
+        range.end = range.start + self.index;
+        self.left_string.1 = Some(range);
+    }
+
+    pub fn right<'a>(&'a mut self) -> Option<&'a DocString> {
+        if self.index >= self.original_range.len() {
+            None
+        } else {
+            self.update_right();
+            Some(&self.right_string)
+        }
+    }
+
+    pub fn destruct(mut self) -> (DocString, DocString) {
+        self.update_left();
+        self.update_right();
+        (self.left_string, self.right_string)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic() {
+        let mut ds = DividedString::new(DocString::from_str("Welcome!"), 1);
+        ds.seek(5);
+        assert_eq!(ds.left().unwrap().as_str(), "e!");
+    }
+
+    #[test]
+    #[should_panic]
+    fn seek_too_far() {
+        let mut ds = DividedString::new(DocString::from_str("Welcome!"), 1);
+        ds.seek(10);
+    }
+
+    #[test]
+    #[should_panic]
+    fn seek_negative() {
+        let mut ds = DividedString::new(DocString::from_str("Welcome!"), 1);
+        ds.seek(3);
+        ds.seek(-10);
+    }
+
+    #[test]
+    fn option_ends() {
+        let mut ds = DividedString::new(DocString::from_str("Welcome!"), 0);
+        assert_eq!(ds.left(), None);
+        assert_eq!(ds.right().is_some(), true);
+        ds.seek("Welcome!".len() as isize);
+        assert_eq!(ds.left().is_some(), true);
+        assert_eq!(ds.right(), None);
     }
 }

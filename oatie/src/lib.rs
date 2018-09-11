@@ -2,7 +2,7 @@
 //!
 //! See the book for more details: http://tcr.github.io/edit-text/
 
-#![feature(nll, range_is_empty, crate_in_paths)]
+#![feature(nll, range_is_empty, crate_in_paths, str_internals)]
 // TODO clean these up
 #![allow(unknown_lints)]
 #![allow(single_char_pattern)]
@@ -27,6 +27,7 @@ extern crate either;
 extern crate regex;
 extern crate ron;
 extern crate serde;
+extern crate core;
 
 /* logging */
 
