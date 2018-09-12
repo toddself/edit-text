@@ -227,7 +227,7 @@ pub fn delete_char_inner(mut walker: Walker) -> Result<Op, Error> {
         };
 
         // TODO what is this? is it needed?
-        let last_doc_stack = block_walker.doc().stack.clone();
+        // let last_doc_stack = block_walker.doc().stack.clone();
 
         // Move to prior block to join it, or abort.
         if !block_walker.back_block_or_block_object() {
@@ -235,10 +235,10 @@ pub fn delete_char_inner(mut walker: Walker) -> Result<Op, Error> {
         }
 
         // TODO what is this? is it needed?
-        let next_doc_stack = block_walker.doc().stack.clone();
-        if last_doc_stack != next_doc_stack {
-            return Ok(op_span!([], []));
-        }
+        // let next_doc_stack = block_walker.doc().stack.clone();
+        // if last_doc_stack != next_doc_stack {
+        //     return Ok(op_span!([], []));
+        // }
 
         // If block is an "hr", delete it.
         if let Some(DocGroup(ref attrs, _)) = block_walker.doc().head() {
