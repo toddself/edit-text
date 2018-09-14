@@ -301,6 +301,15 @@ impl CharCursor {
         self.index
     }
 
+    pub fn index_from_end(&self) -> usize {
+        unsafe {
+            // TODO this is incorrect (unwrap_or should be str len),
+            // try_byte_range really needs to be replaced
+            // with something that guarantees a range
+            self.right_string.try_byte_range().map(|x| x.len()).unwrap_or(0)
+        }
+    }
+
     pub fn value_add(&mut self, add: usize) {
         self.index += add;
         unsafe {

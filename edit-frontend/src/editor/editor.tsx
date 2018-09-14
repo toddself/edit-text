@@ -489,6 +489,8 @@ export class Editor extends React.Component {
   }
   
   componentDidUpdate() {
+    this.el.innerHTML = this.props.content;
+
     // Highlight our own caret.
     document.querySelectorAll(
       `div[data-tag="caret"][data-client=${JSON.stringify(this.props.editorID)}]`,
@@ -508,6 +510,8 @@ export class Editor extends React.Component {
     document.addEventListener('keydown', (e) => {
       this.onGlobalKeydown(e);
     });
+
+    this.el.innerHTML = this.props.content;
   }
 
   render() {
@@ -520,9 +524,6 @@ export class Editor extends React.Component {
         onMouseDown={this.onMouseDown.bind(this)}
         onMouseUp={this.onMouseUp.bind(this)}
         onMouseMove={this.onMouseMove.bind(this)}
-        dangerouslySetInnerHTML={{
-          __html: this.props.content,
-        }}
       />
     );
   }
