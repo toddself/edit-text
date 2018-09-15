@@ -30,27 +30,23 @@ export function vm(el: Node) {
         return cur()[1].childNodes[cur()[0]];
     };
 
-    return {
-    		is_done() {
-					return (stack.length == 1 && cur()[0] >= cur()[1].childNodes.length) || stack.length == 0;
-        },
-
+    let handlers: {[value: string]: Function} = {
         Enter() {
             let node = curNode();
             assert(node.nodeType == 1);
             stack.push([0, node]);
         },
-        Unenter() {
+        Exit() {
             assert(stack.length > 1); // Can't unenter root
             stack.pop();
             
             // Also perform stack advancement
             cur()[0] += 1;
-            assert(cur()[1].childNodes.length <= cur()[0]);
+            assert(cur()[1].childNodes.length >= cur()[0]);
         },
         AdvanceElements(n: number) { // By element
             cur()[0] += n;
-            assert(cur()[1].childNodes.length <= cur()[0]);
+            assert(cur()[1].childNodes.length >= cur()[0]);
         },
         DeleteElements(n: number) {
             for (let i = 0; i < n; i++) {
@@ -58,21 +54,26 @@ export function vm(el: Node) {
                 curNode().parentNode!.removeChild(curNode());
             }
         },
-        InsertDocString(s: string) {
+        InsertDocString([text, styles]: [string, any]) {
             let span = document.createElement('span');
-            span.innerText = s;
+            span.innerText = text;
+            Object.keys(styles).map(key => {
+                span.classList.add(key);
+            });
             cur()[1].insertBefore(span, curNode());
+            cur()[0] += 1;
         },
-        WrapPrevious(n: number, attrs: any) {
+        WrapPrevious([n, attrs]: [number, any]) {
             let div = document.createElement('div');
             Object.keys(attrs).forEach(key => {
-            	div.setAttribute(key, attrs[key]);
-            })
+            	div.setAttribute('data-' + key, attrs[key]);
+            });
             // TODO attrs
             cur()[1].insertBefore(div, curNode());
             for (let i = 0; i < n; i++) {
                 div.insertBefore(div.previousSibling!, div.firstChild);
             }
+            cur()[0] += 1;
         },
         UnwrapSelf() {
             let node = cur()[1];
@@ -83,7 +84,22 @@ export function vm(el: Node) {
             }
             node.parentNode!.removeChild(node);
         }
-    }
+    };
+
+    return {
+        stack,
+        cur,
+        curNode,
+        is_done() {
+            return (stack.length == 1 && cur()[0] >= cur()[1].childNodes.length) || stack.length == 0;
+        },
+        handle(tag: string, fields: any) {
+            if (!handlers[tag]) {
+                throw new Error(`Unknown opcode ${tag}`)
+            }
+            handlers[tag]!(fields);
+        }
+    };
 }
 
 /*

@@ -12,7 +12,7 @@ pub enum Bytecode {
     Exit,
     AdvanceElements(usize),
     DeleteElements(usize),
-    InsertString(String),
+    InsertDocString(DocString),
     WrapPrevious(usize, Attrs),
     UnwrapSelf,
 }
@@ -25,6 +25,7 @@ impl Program {
         Program(vec![])
     }
 
+    // Collapse trivial operations together.
     pub fn place(&mut self, mut code: Bytecode) {
         use self::Bytecode::*;
         match (self.0.last_mut(), &mut code) {
@@ -34,9 +35,9 @@ impl Program {
             (Some(&mut DeleteElements(ref mut last_n)), DeleteElements(n)) => {
                 *last_n += *n;
             }
-            (Some(&mut InsertString(ref mut last_str)), InsertString(ref mut new_n)) => {
-                *last_str = format!("{}{}", last_str.as_str(), new_n.as_str());
-            }
+            // (Some(&mut InsertString(ref mut last_str)), InsertString(ref mut new_n)) => {
+            //     *last_str = format!("{}{}", last_str.as_str(), new_n.as_str());
+            // }
             _ => self.0.push(code.clone()),
         }
     }
@@ -50,7 +51,7 @@ impl Program {
     // }
 }
 
-fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (DocSpan, DocSpan) {
+fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan, mut partial: bool) -> (DocSpan, DocSpan, bool) {
     let mut span = &spanvec[..];
     let mut del = &delvec[..];
 
@@ -63,7 +64,7 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
     let mut res: DocSpan = Vec::with_capacity(span.len());
 
     if del.is_empty() {
-        return (vec![], spanvec.clone().to_vec());
+        return (vec![], spanvec.clone().to_vec(), false);
     }
 
     let mut d = del[0].clone();
@@ -74,7 +75,7 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
     trace!("ABOUT TO APPLY ADD {:?} {:?}", first, span);
 
     loop {
-        // Flags for whether we have partially or fully consumed an atom.
+        // Flags for whether we have partially or fully consumed an element.
         let mut nextdel = true;
         let mut nextfirst = true;
 
@@ -95,25 +96,25 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
                     if value.char_len() < count {
                         d = AddStyles(count - value.char_len(), styles.clone());
                         value.extend_styles(&styles);
-                            let inner_text = value.to_string();
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(value.clone()));
+                            partial = false;
                         res.place(&DocChars(value));
                         nextdel = false;
                     } else if value.char_len() > count {
                         let (mut left, right) = value.split_at(count);
                         left.extend_styles(&styles);
-                            let inner_text = left.to_string();
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(left.clone()));
+                            partial = false;
                         res.place(&DocChars(left));
                         first = Some(DocChars(right));
                         nextfirst = false;
                     } else {
                         value.extend_styles(&styles);
-                            let inner_text = value.to_string();
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(value.clone()));
+                            partial = false;
                         res.place(&DocChars(value));
                     }
                 }
@@ -123,22 +124,35 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
             },
             AddSkip(count) => match first.clone().unwrap() {
                 DocChars(value) => {
-                    if value.char_len() < count {
+                    if count > value.char_len() {
+                        // Consume and advance
                         d = AddSkip(count - value.char_len());
-                            bc.place(Bytecode::AdvanceElements(1));
+                            if !partial {
+                                bc.place(Bytecode::AdvanceElements(1));
+                                partial = false;
+                            } else {
+                                bc.place(Bytecode::DeleteElements(1));
+                                bc.place(Bytecode::InsertDocString(value.clone()));
+                            }
                         res.place(&DocChars(value));
                         nextdel = false;
-                    } else if value.char_len() > count {
+                    } else if count < value.char_len() {
                         let (left, right) = value.split_at(count);
-                            let inner_text = left.to_string();
-                            // we assume
+                            // Split text element, we assume
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(left.clone()));
+                            partial = true;
                         res.place(&DocChars(left));
                         first = Some(DocChars(right));
                         nextfirst = false;
                     } else {
-                            bc.place(Bytecode::AdvanceElements(1));
+                            if !partial {
+                                bc.place(Bytecode::AdvanceElements(1));
+                                partial = false;
+                            } else {
+                                bc.place(Bytecode::DeleteElements(1));
+                                bc.place(Bytecode::InsertDocString(value.clone()));
+                            }
                         res.place(&DocChars(value));
                     }
                 }
@@ -164,8 +178,7 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
             AddChars(value) => {
                     // TODO where do you skip anything, exactly
                     // need to manifest the place issue externally as well
-                    let inner_text = value.to_string();
-                    bc.place(Bytecode::AdvanceElements(1));
+                    bc.place(Bytecode::InsertDocString(value.clone()));
                 res.place(&DocChars(value));
                 nextfirst = false;
             }
@@ -177,19 +190,40 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
                 }
                 trace!("CALLING INNER {:?} {:?}", subdoc, innerspan);
 
-                let (inner, rest) = apply_add_inner(bc, &subdoc, &innerspan);
+                // Apply the inner AddSpan inside the group...
+                let (inner, rest, partial_inner) = apply_add_inner(bc, &subdoc, &innerspan, partial);
                 res.place(&DocGroup(attrs.clone(), inner));
+
+                console_log!("partial A {:?}", partial);
+                console_log!("partial B {:?}", partial_inner);
 
                 trace!("REST OF INNER {:?} {:?}", rest, del);
 
-                let (inner, rest) = apply_add_inner(bc, &rest, &del.to_vec());
-                res.place_all(&inner);
-
-                    // TODO not 1.
+                    // TODO not hardcode a random number.
                     // Wrap previous elements in the inner span.
-                    bc.place(Bytecode::WrapPrevious(1, attrs));
+                    bc.place(Bytecode::WrapPrevious(0, attrs));
 
-                return (res, rest);
+                // Then apply it outside of the group.
+                //TODO partial inner should be... something else
+                let (mut inner, rest, partial_rest) = apply_add_inner(bc, &rest, &del.to_vec(), partial_inner || partial);
+                // if partial_inner || partial || partial_rest {
+                //     if inner.len() > 0 {
+                //         bc.place(Bytecode::DeleteElements(1));
+                //         match &inner[0] {
+                //             &DocChars(ref text) => {
+                //                 bc.place(Bytecode::InsertDocString(text.clone()));
+                //             }
+                //             _ => unreachable!(),
+                //         }
+                //     } else {
+                //         console_log!("whaaaat....");
+                //     }
+                // }
+                    // console_log!("partial B {:?} {:?}", inner, rest);
+                res.place_all(&inner);
+                console_log!("partial C {:?}", partial);
+
+                return (res, rest, partial);
             }
         }
 
@@ -202,7 +236,7 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
                     // place_any(&mut res, &first.clone().unwrap());
                 }
                 remaining.extend_from_slice(span);
-                return (res, remaining);
+                return (res, remaining, partial);
             }
 
             d = del[0].clone();
@@ -222,10 +256,21 @@ fn apply_add_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> (Do
 
 // TODO replace all occurances of this with apply_add_inner 
 fn apply_add_outer(bc: &mut Program, spanvec: &DocSpan, delvec: &AddSpan) -> DocSpan {
-    let (mut res, remaining) = apply_add_inner(bc, spanvec, delvec);
+    let (mut res, mut remaining, partial) = apply_add_inner(bc, spanvec, delvec, false);
 
     // TODO never accept unbalanced components?
     if !remaining.is_empty() {
+        if partial {
+            let text = remaining.remove(0);
+            bc.place(Bytecode::DeleteElements(1));
+            match text {
+                DocChars(text) => {
+                    console_log!("adding {:?}", text);
+                    bc.place(Bytecode::InsertDocString(text));
+                }
+                _ => unreachable!(),
+            }
+        }
         res.place_all(&remaining);
         // panic!("Unbalanced apply_add");
     }
@@ -276,25 +321,22 @@ fn apply_del_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &DelSpan) -> Doc
                     if value.char_len() < count {
                         d = DelStyles(count - value.char_len(), styles.clone());
                         value.remove_styles(&styles);
-                            let inner_text = value.to_string();
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(value.clone()));
                         res.place(&DocChars(value));
                         nextdel = false;
                     } else if value.char_len() > count {
                         let (mut left, right) = value.split_at(count);
                         left.remove_styles(&styles);
-                            let inner_text = left.to_string();
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(left.clone()));
                         res.place(&DocChars(left));
                         first = DocChars(right);
                         nextfirst = false;
                     } else {
                         value.remove_styles(&styles);
-                            let inner_text = value.to_string();
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(value.clone()));
                         res.place(&DocChars(value));
                     }
                 }
@@ -311,10 +353,9 @@ fn apply_del_inner(bc: &mut Program, spanvec: &DocSpan, delvec: &DelSpan) -> Doc
                         nextdel = false;
                     } else if value.char_len() > count {
                         let (left, right) = value.split_at(count);
-                            let inner_text = left.to_string();
-                            // we assume
+                            // Assume this should be deleted from the left
                             bc.place(Bytecode::DeleteElements(1));
-                            bc.place(Bytecode::InsertString(inner_text));
+                            bc.place(Bytecode::InsertDocString(left.clone()));
                         res.place(&DocChars(left));
                         first = DocChars(right);
                         nextfirst = false;
