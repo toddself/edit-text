@@ -392,6 +392,15 @@ export class EditorFrame extends React.Component {
       });
     }
 
+    else if (parse.UpdateFull) {
+      DEBUG.measureTime('first-update');
+
+      // Update page content
+      this.setState({
+        body: parse.UpdateFull[0],
+      });
+    }
+
     else if (parse.Controls) {
       // console.log('SETUP CONTROLS', parse.Controls);
 
@@ -496,6 +505,17 @@ class EditText extends React.Component {
 
         if (this.props.onChange !== null) {
           this.props.onChange(parse.Update[1]);
+        }
+      }
+  
+      else if (parse.UpdateFull) {
+        // Update page content
+        this.setState({
+          content: parse.UpdateFull[0],
+        });
+
+        if (this.props.onChange !== null) {
+          this.props.onChange(parse.UpdateFull[1]);
         }
       }
 
