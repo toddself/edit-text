@@ -597,3 +597,21 @@ mod tests {
         assert_eq!(stepper.peek().is_none(), true);
     }
 }
+
+// pub struct DocMutator {
+//     stepper: DocStepper,
+//     pub bc: Program,
+// }
+
+// impl DocMutator {
+//     pub fn InsertDocString(&mut self...) {
+//         self.bc.place(&InsertDocString(...));
+//         ...
+//     }
+
+//     ...
+
+//     pub fn result(self) -> (Doc, Program) {
+//         (self.stepper.doc, self.bc)
+//     }
+// }
