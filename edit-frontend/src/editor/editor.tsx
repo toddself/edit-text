@@ -494,12 +494,7 @@ export class Editor extends React.Component {
   }
 
   _runProgram(program: any) {
-    let context = vm(this.el);
-    console.log('(vm) vvvvvvv start vvvvvvv');
-    program.forEach((opcode: any) => {
-      console.log('(vm)', JSON.stringify(opcode));
-      context.handle(opcode.tag, opcode.fields);
-    });
+    vm(this.el).run(program);
   }
   
   componentDidUpdate() {

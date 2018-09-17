@@ -387,11 +387,33 @@ export class EditorFrame extends React.Component {
 
     else if (parse.Update) {
       // Update page content
+      // console.groupCollapsed('Parse Update');
+      // console.log(JSON.stringify(parse.Update[2]));
       let programs = JSON.parse(parse.Update[0]);
       programs.forEach((program: any) => {
+        // console.log('🚗🚗🚗🚗', program, '\n');
         this.editor!._runProgram(program);
+
+        // Corrections
+        // while (true) {
+        //   let unjoinedSpans = document.querySelector('.edit-text span.Normie + span.Normie');
+        //   if (unjoinedSpans === null) {
+        //     break;
+        //   }
+        //   let right = unjoinedSpans;
+        //   let left = right.previousSibling;
+        //   while (right.childNodes.length) {
+        //     left!.appendChild(right.firstChild!);
+        //   }
+        //   right!.parentNode!.removeChild(right);
+        //   left!.normalize();
+        // }
+
+        // console.log('👿👿👿👿👿👿', document.querySelector('.edit-text')!.innerHTML);
       });
-      console.log(document.querySelector('.edit-text')!.innerHTML);
+      // console.log(parse.Update[0]);
+      // console.log(document.querySelector('.edit-text')!.innerHTML);
+      // console.groupEnd();
       // this.setState({
       //   body: JSON.stringify(parse.Update[0], null, '  '),
       // });

@@ -14,6 +14,8 @@ WrapPrevious(n, Attrs)
 
 */
 
+import * as util from './util';
+
 function assert(condition: boolean) {
     if (!condition) {
         throw new Error('Condition failed.');
@@ -28,6 +30,9 @@ export function vm(el: Node) {
     let curNode = () => {
         assert(cur()[0] <= cur()[1].childNodes.length);
         return cur()[1].childNodes[cur()[0]];
+    };
+    let lastNode = (): any | null => {
+        return cur()[1].childNodes[cur()[0] - 1];
     };
 
     let handlers: {[value: string]: Function} = {
@@ -55,11 +60,34 @@ export function vm(el: Node) {
             }
         },
         InsertDocString([text, styles]: [string, any]) {
+            // TODO If this element is following a text node, we just add it
+            // to the previous element. right?
+
             let span = document.createElement('span');
-            span.innerText = text;
+            span.appendChild(document.createTextNode(text));
             Object.keys(styles).map(key => {
                 span.classList.add(key);
             });
+
+            // Excessive matching function in JS, where this shouldn't happen
+            function hasMatchingTextStyles(left: any, right: any) {
+                if (left != null) {
+                    if (util.matchesSelector(left, 'span')) {
+                        let leftClasses = Array.from(lastNode().classList).sort();
+                        let rightClasses = Array.from(span.classList).sort();
+    
+                        if (leftClasses.join(' ') == rightClasses.join(' ')) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            if (hasMatchingTextStyles(lastNode(), span)) {
+                lastNode().append(span.firstChild);
+                lastNode().normalize();
+                return;
+            }
             cur()[1].insertBefore(span, curNode());
             cur()[0] += 1;
         },
@@ -68,7 +96,6 @@ export function vm(el: Node) {
             Object.keys(attrs).forEach(key => {
             	div.setAttribute('data-' + key, attrs[key]);
             });
-            // TODO attrs
             cur()[1].insertBefore(div, curNode());
             for (let i = 0; i < n; i++) {
                 div.insertBefore(div.previousSibling!, div.firstChild);
@@ -83,6 +110,19 @@ export function vm(el: Node) {
                 node.parentNode!.insertBefore(node.firstChild!, node);
             }
             node.parentNode!.removeChild(node);
+        },
+
+        // Take current text node, merge it left, and move on
+        JoinTextLeft() {
+            let right = curNode();
+            assert!(util.matchesSelector(right, 'span'));
+
+            let left = right.previousSibling;
+            while (right.childNodes.length) {
+                left!.appendChild(right.firstChild!);
+            }
+            left!.normalize(); // Whoa
+            right!.parentNode!.removeChild(right);
         }
     };
 
@@ -97,7 +137,18 @@ export function vm(el: Node) {
             if (!handlers[tag]) {
                 throw new Error(`Unknown opcode ${tag}`)
             }
+            // console.warn(tag);
             handlers[tag]!(fields);
+        },
+        run(program: Array<any>) {
+            // console.group('VM group: %d opcodes', program.length)
+            // console.log('\n(vm) 🔜');
+            program.forEach((opcode: any) => {
+                // console.log('(vm)', JSON.stringify(opcode));
+                this.handle(opcode.tag, opcode.fields);
+            });
+            // console.log('(vm) 🔚\n\n');
+            // console.groupEnd()
         }
     };
 }
