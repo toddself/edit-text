@@ -2,57 +2,28 @@ use super::*;
 
 // DocStepper
 
-// For now, this is the rental struct that DocStepper must use until
-// all callsites are converted into supporting a lifetime-bound DocStepper.
-rental! {
-    pub mod doc_stepper_rental {
-        use super::*;
-
-        #[rental(clone, debug, covariant)]
-        pub struct DocStepperCursor {
-            root: Arc<DocSpan>,
-            inner: DocStepperInner<'root>,
-        }
-    }
-}
-
 // Where we define the impl on.
 #[derive(Clone, Debug)]
-pub struct DocStepper {
-    pub(crate) cursor: doc_stepper_rental::DocStepperCursor,
-}
-
-// Where the inner contents are.
-#[derive(Clone, Debug)]
-pub struct DocStepperInner<'a> {
+pub struct DocStepper<'a> {
     pub(crate) char_cursor: Option<CharCursor>,
     pub(crate) stack: Vec<(isize, &'a [DocElement])>,
 }
 
 // DocStepper impls
 
-impl PartialEq for DocStepper {
-    fn eq(&self, other: &DocStepper) -> bool {
-        self.cursor.rent_all(|a| {
-            other.cursor.rent_all(|b| {
-                (a.inner.char_cursor.as_ref().map(|c| c.value()) == b.inner.char_cursor.as_ref().map(|c| c.value())
-                    && a.inner.stack == b.inner.stack
-                    && a.root == b.root)
-            })
-        })
+impl<'a> PartialEq for DocStepper<'a> {
+    fn eq(&self, b: &DocStepper) -> bool {
+        let a = self;
+        (a.char_cursor.as_ref().map(|c| c.value()) == b.char_cursor.as_ref().map(|c| c.value())
+            && a.stack == b.stack)
     }
 }
 
-impl DocStepper {
+impl<'a> DocStepper<'a> {
     pub fn new(span: &DocSpan) -> DocStepper {
         let mut stepper = DocStepper {
-            cursor: doc_stepper_rental::DocStepperCursor::new(
-                Arc::new(span.clone()),
-                |span| DocStepperInner {
-                    char_cursor: None,
-                    stack: vec![(0, &span)],
-                },
-            ),
+            char_cursor: None,
+            stack: vec![(0, span)],
         };
         stepper.char_cursor_update();
         stepper
@@ -70,11 +41,11 @@ impl DocStepper {
         } else {
             None
         };
-        self.cursor.rent_all_mut(|target| target.inner.char_cursor = cursor);
+        self.char_cursor = cursor;
     }
 
     pub fn char_index(&self) -> Option<usize> {
-        self.cursor.suffix().char_cursor.as_ref().map(
+        self.char_cursor.as_ref().map(
             |cc| cc.left().map(|s| s.char_len()).unwrap_or(0)
         )
     }
@@ -90,59 +61,55 @@ impl DocStepper {
             }
             _ => None,
         };
-        self.cursor.rent_all_mut(|target| target.inner.char_cursor = cursor);
+        self.char_cursor = cursor;
     }
 
     pub fn char_cursor_expect(&self) -> &CharCursor {
-        self.cursor.suffix().char_cursor.as_ref()
+        self.char_cursor.as_ref()
             .expect("Expected a generated char cursor")
     }
 
     fn char_cursor_expect_add(&mut self, add: usize) {
-        self.cursor.rent_all_mut(|target| target.inner.char_cursor.as_mut()
+        self.char_cursor.as_mut()
             .expect("Expected a generated char cursor")
-            .value_add(add));
+            .value_add(add);
     }
 
     fn char_cursor_expect_sub(&mut self, sub: usize) {
-        self.cursor.rent_all_mut(|target| target.inner.char_cursor.as_mut()
+        self.char_cursor.as_mut()
             .expect("Expected a generated char cursor")
-            .value_sub(sub));
+            .value_sub(sub);
     }
 
     // Current row in the stack is a DocSpan reference and an index.
     // What DocElement the index points to is the "head". If the head points
     // to a DocChars, we also create a char_cursor to index into the string.
 
-    pub(crate) fn current<'a>(&'a self) -> &(isize, &'a [DocElement]) {
-        self.cursor.suffix().stack.last().unwrap()
+    pub(crate) fn current(&'a self) -> &(isize, &'a [DocElement]) {
+        self.stack.last().unwrap()
     }
 
     pub(crate) fn head_index(&self) -> usize {
         self.current().0 as usize
     }
 
-    pub(crate) fn head_index_add<'a>(&'a mut self, add: usize) {
-        self.cursor.rent_mut(|target| {
-            target.stack.last_mut().unwrap().0 += add as isize;
-        });
+    pub(crate) fn head_index_add(&mut self, add: usize) {
+        self.stack.last_mut().unwrap().0 += add as isize;
         self.char_cursor_update();
     }
 
-    pub(crate) fn head_index_sub<'a>(&'a mut self, sub: usize) {
-        self.cursor.rent_mut(|target| {
-            target.stack.last_mut().unwrap().0 -= sub as isize;
-        });
+    pub(crate) fn head_index_sub(&mut self, sub: usize) {
+        self.stack.last_mut().unwrap().0 -= sub as isize;
         self.char_cursor_update();
     }
 
-    pub(crate) fn head_raw<'a>(&'a self) -> Option<&'a DocElement> {
+    pub(crate) fn head_raw(&'a self) -> Option<&'a DocElement> {
         self.current().1.get(self.head_index())
     }
 
-    pub(crate) fn unhead_raw<'a>(&'a self) -> Option<&'a DocElement> {
+    pub(crate) fn unhead_raw(&'a self) -> Option<&'a DocElement> {
         // If we've split a string, don't modify the index.
-        if self.cursor.suffix().char_cursor.as_ref()
+        if self.char_cursor.as_ref()
             .map(|c| c.value() > 0)
             .unwrap_or(false) {
             return self.head_raw();
@@ -221,7 +188,7 @@ impl DocStepper {
     } 
 
     pub fn skip(&mut self, mut skip: usize) {
-        if let Some(ref char_cursor) = &self.cursor.suffix().char_cursor {
+        if let Some(ref char_cursor) = &self.char_cursor {
             let remaining = char_cursor.index_from_end();
             if remaining == skip {
                 self.next();
@@ -269,7 +236,7 @@ impl DocStepper {
     // Cursor stack operations.
 
     pub fn at_root(&self) -> bool {
-        self.cursor.suffix().stack.len() <= 1
+        self.stack.len() <= 1
     }
 
     pub fn is_back_done(&self) -> bool {
@@ -281,22 +248,18 @@ impl DocStepper {
     }
     
     pub fn unenter(&mut self) -> &mut Self {
-        self.cursor.rent_all_mut(|target| {
-            target.inner.stack.pop();
-        });
+        self.stack.pop();
         self.char_cursor_update();
         self
     }
 
     pub fn enter(&mut self) -> &mut Self {
-        self.cursor.rent_all_mut(|target| {
-            let index = target.inner.stack.last().unwrap().0 as usize;
-            if let &DocGroup(_, ref inner) = &target.inner.stack.last().unwrap().1[index] {
-                target.inner.stack.push((0, inner));
-            } else {
-                panic!("DocStepper::enter() called on inappropriate element");
-            }
-        });
+        let index = self.stack.last().unwrap().0 as usize;
+        if let &DocGroup(_, ref inner) = &self.stack.last().unwrap().1[index] {
+            self.stack.push((0, inner));
+        } else {
+            panic!("DocStepper::enter() called on inappropriate element");
+        }
         self.char_cursor_update();
         self
     }

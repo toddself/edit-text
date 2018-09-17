@@ -335,7 +335,8 @@ pub fn add_string(ctx: ActionContext, input: &str) -> Result<Op, Error> {
 
     // Identify previous styles.
     let mut char_walker = walker.clone();
-    if let Some(DocChars(ref prefix)) = char_walker.back_char().doc().head() {
+    char_walker.back_char();
+    if let Some(DocChars(ref prefix)) = char_walker.doc().head() {
         if let Some(prefix_styles) = prefix.styles() {
             styles.extend(
                 prefix_styles
