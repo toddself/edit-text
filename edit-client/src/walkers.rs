@@ -66,10 +66,8 @@ impl<'a> CaretStepper<'a> {
         if let Some(DocChars(..)) = self.doc.unhead() {
             return true;
         } else if self.doc.unhead().is_none() && !self.doc.is_back_done() {
-            if let Some(DocGroup(ref attrs, _)) = self.doc.clone().unenter().head() {
-                if is_block(attrs) {
-                    return true;
-                }
+            if is_block(self.doc.parent_attrs()) {
+                return true;
             }
         }
         return false;
@@ -147,7 +145,22 @@ impl<'a> ReverseCaretStepper<'a> {
     pub fn is_valid_caret_pos(&self) -> bool {
         // Skip over all preceding carets so we can identify the previous node
         // more easily.
-        // TODO can this clone be avoided?
+        
+        // Fast-path
+        if let Some(DocChars(..)) = self.doc.unhead() {
+            return true;
+        } else if self.doc.unhead().is_none() {
+            if self.doc.at_root() {
+                // end of document, bail
+                return false;
+            }
+            if is_block(self.doc.parent_attrs()) {
+                return true;
+            }
+        }
+
+        // Move back through the cursors, cloning the document stepper
+        // TODO need a real caret stepper model so this can be avoided
         let mut doc2 = self.doc.clone();
         while let Some(DocGroup(ref attrs, _)) = doc2.unhead() {
             if is_any_caret(attrs) {
@@ -156,7 +169,8 @@ impl<'a> ReverseCaretStepper<'a> {
                 break;
             }
         }
-
+        
+        // Identically repeat fast-path logic 
         if let Some(DocChars(..)) = doc2.unhead() {
             return true;
         } else if doc2.unhead().is_none() {
@@ -164,10 +178,8 @@ impl<'a> ReverseCaretStepper<'a> {
                 // end of document, bail
                 return false;
             }
-            if let Some(DocGroup(ref attrs, _)) = doc2.clone().unenter().head() {
-                if is_block(attrs) {
-                    return true;
-                }
+            if is_block(doc2.parent_attrs()) {
+                return true;
             }
         }
         return false;

@@ -104,11 +104,10 @@ export function vm(el: Node) {
         },
         UnwrapSelf() {
             let node = cur()[1];
-		        stack.pop();
-            while (node.childNodes.length) {
-            		cur()[0] += 1;
-                node.parentNode!.insertBefore(node.firstChild!, node);
-            }
+            stack.pop();
+            let children = Array.from(node.childNodes);
+            cur()[0] += children.length
+            children.forEach(child => node.parentNode!.insertBefore(child, node));
             node.parentNode!.removeChild(node);
         },
 

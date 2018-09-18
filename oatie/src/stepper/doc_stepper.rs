@@ -39,7 +39,7 @@ impl<'a> DocStepper<'a> {
     //TODO pub(crate) plz?
     pub fn char_cursor_update(&mut self) { 
         let cursor = if let Some(&DocChars(ref text)) = self.head_raw() {
-            self.cursor.update_from_docstring(text);
+            Some(CharCursor::from_docstring(text))
         } else {
             None
         };
@@ -97,6 +97,15 @@ impl<'a> DocStepper<'a> {
 
     pub(crate) fn current<'h>(&'h self) -> &'h (isize, &'a [DocElement]) {
         self.stack.last().unwrap()
+    }
+
+    pub fn parent_attrs(&self) -> &Attrs {
+        let (index, ref list) = &self.stack[self.stack.len() - 2];
+        if let DocGroup(ref attrs, ..) = &list[*index as usize] {
+            attrs
+        } else {
+            unreachable!();
+        }
     }
 
     pub(crate) fn head_index(&self) -> usize {
