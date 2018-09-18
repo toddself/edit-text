@@ -469,6 +469,7 @@ dependencies = [
  "uuid 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasm-bindgen 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "wbg-rand 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wee_alloc 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ws 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1138,6 +1139,11 @@ dependencies = [
 [[package]]
 name = "memoffset"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "memory_units"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -2723,6 +2729,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "wee_alloc"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "cfg-if 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory_units 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "winapi"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2919,6 +2937,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum memchr 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "148fab2e51b4f1cfc66da2a7c32981d1d3c083a803978268bb11fe4b86925e7a"
 "checksum memchr 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a3b4142ab8738a78c51896f704f83c11df047ff1bda9a92a661aa6361552d93d"
 "checksum memoffset 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0f9dc261e2b62d7a622bf416ea3c5245cdd5d9a7fcc428c0d06804dfce1775b3"
+"checksum memory_units 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 "checksum mime 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ba626b8a6de5da682e1caa06bdb42a335aee5a84db8e5046a3e8ab17ba0a3ae0"
 "checksum mime 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "4b082692d3f6cf41b453af73839ce3dfc212c4411cbb2441dff80a716e38bd79"
 "checksum mime_guess 1.8.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2d4c0961143b8efdcfa29c3ae63281601b446a4a668165454b6c90f8024954c5"
@@ -3091,6 +3110,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum wasm-bindgen-shared 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)" = "13d45ad95e1245d26ba841fddbaf162bccb65bee7b8cca57d43b5ef5c58bdd93"
 "checksum wbg-rand 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "319e26dc892d5c1450bf898e34d5e29d602eb830afc40d497a0d64a8e7ac33fa"
 "checksum webdriver 0.34.0 (registry+https://github.com/rust-lang/crates.io-index)" = "519a647b234c27bb8c25af8cd18ceb9cc2a5d5a3245c8355f9ab6bc2a4857d2a"
+"checksum wee_alloc 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "27875be1daf838fa18f3e94fd19fd12638e34615b42f56da2610c8f46be80cc6"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "773ef9dcc5f24b7d850d0ff101e542ff24c3b090a9768e03ff889fdef41f00fd"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"

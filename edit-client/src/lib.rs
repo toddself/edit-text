@@ -1,7 +1,11 @@
 #![feature(crate_in_paths, nll)]
 #![feature(extern_in_paths, use_extern_macros)]
 #![allow(unused_imports)]
+// Required to replace the global allocator.
+#![feature(global_allocator)]
 
+#[cfg(target_arch = "wasm32")]
+extern crate wee_alloc;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -50,3 +54,8 @@ pub use self::actions::*;
 pub use self::client::*;
 pub use self::random::*;
 pub use self::state::*;
+
+// Use `wee_alloc` as the global allocator.
+// #[cfg(target_arch = "wasm32")]
+// #[global_allocator]
+// static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
