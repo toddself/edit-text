@@ -138,7 +138,28 @@ export function vm(el: Node) {
                 throw new Error(`Unknown opcode ${tag}`)
             }
             // console.warn(tag);
-            handlers[tag]!(fields);
+            switch (tag) {
+                case 'AdvanceElements':
+                    assert(typeof fields == 'number');
+                    return handlers.AdvanceElements(fields);
+                case 'DeleteElements':
+                    assert(typeof fields == 'number');
+                    return handlers.DeleteElements(fields);
+                case 'InsertDocString':
+                    assert(Array.isArray(fields));
+                    assert(fields.length == 2);
+                    assert(typeof fields[0] == 'string');
+                    assert(typeof fields[1] == 'object');
+                    return handlers.InsertDocString(fields);
+                case 'WrapPrevious':
+                    assert(Array.isArray(fields));
+                    assert(fields.length == 2);
+                    assert(typeof fields[0] == 'number');
+                    assert(typeof fields[1] == 'object');
+                    return handlers.WrapPrevious(fields);
+                default:
+                    return handlers[tag]!();
+            }
         },
         run(program: Array<any>) {
             // console.group('VM group: %d opcodes', program.length)

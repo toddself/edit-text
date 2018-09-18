@@ -76,11 +76,10 @@ impl<'a, 'b> Iterator for DocToMarkdown<'a, 'b> {
                 res
             }
             Some(DocChars(ref text)) => {
-                self.doc_stepper.next();
 
                 // Styling.
                 let text_event = Event::Text(text.to_string().replace("\n", "  \n").into());
-                if let Some(styles) = text.styles() {
+                let res = if let Some(styles) = text.styles() {
                     if styles.contains_key(&Style::Bold) {
                         self.queue.push(text_event);
                         self.queue.push(Event::End(Tag::Strong));
@@ -90,7 +89,10 @@ impl<'a, 'b> Iterator for DocToMarkdown<'a, 'b> {
                     }
                 } else {
                     Some(text_event)
-                }
+                };
+
+                self.doc_stepper.next();
+                res
             }
             None => {
                 if self.doc_stepper.is_done() {

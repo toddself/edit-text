@@ -44,7 +44,7 @@ pub struct CaretStepper<'a> {
 }
 
 impl<'a> CaretStepper<'a> {
-    pub fn new(doc: DocStepper) -> CaretStepper {
+    pub fn new(doc: DocStepper<'a>) -> CaretStepper<'a> {
         // Start at caret pos 0
         let mut stepper = CaretStepper { doc, caret_pos: -1 };
         while stepper.caret_pos != 0 {
@@ -225,14 +225,14 @@ pub struct Walker<'a> {
 }
 
 impl<'a> Walker<'a> {
-    pub fn new(doc: &Doc) -> Walker {
+    pub fn new(doc: &'a Doc) -> Walker<'a> {
         Walker {
             original_doc: doc.clone(),
             stepper: CaretStepper::new(DocStepper::new(&doc.0)),
         }
     }
 
-    pub fn doc(&self) -> &DocStepper {
+    pub fn doc(&self) -> &'a DocStepper {
         &self.stepper.doc
     }
 
@@ -585,13 +585,14 @@ impl<'a> Walker<'a> {
         let mut add = AddWriter::new();
 
         // Walk the doc until we reach our current doc position.
-        let mut doc_stepper = DocStepper::new(&self.original_doc.0);
         let mut current_stepper = self.stepper.doc.clone();
 
         let char_index = current_stepper.char_index();
         current_stepper.char_cursor_update();
 
-        while doc_stepper != current_stepper {
+        let mut doc_stepper = DocStepper::new(&self.original_doc.0);
+        // TODO added raw_index since raw partialeq operation breaks. see DocStepper:raw_index
+        while unsafe { current_stepper.raw_index() != doc_stepper.raw_index() } {
             // console_log!("head ----> {:?}", doc_stepper.head());
             // console_log!("head stack len ---> {:?}", doc_stepper.stack().len());
             // console_log!("head stack ---> {:?}", doc_stepper.stack());
@@ -620,7 +621,6 @@ impl<'a> Walker<'a> {
             }
         }
 
-
         if let Some(index) = char_index {
             if index > 0 {
                 del.place(&DelSkip(index));
@@ -631,7 +631,7 @@ impl<'a> Walker<'a> {
         OpWriter { del, add }
     }
 
-    pub fn stepper(&self) -> &DocStepper {
+    pub fn stepper(&self) -> &'a DocStepper {
         &self.stepper.doc
     }
 }

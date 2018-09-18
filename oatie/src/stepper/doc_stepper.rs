@@ -1,4 +1,5 @@
 use super::*;
+use smallvec::SmallVec;
 
 // DocStepper
 
@@ -12,7 +13,7 @@ pub struct DocStepper<'a> {
 // DocStepper impls
 
 impl<'a> PartialEq for DocStepper<'a> {
-    fn eq(&self, b: &DocStepper) -> bool {
+    fn eq(&self, b: &DocStepper<'a>) -> bool {
         let a = self;
         (a.char_cursor.as_ref().map(|c| c.value()) == b.char_cursor.as_ref().map(|c| c.value())
             && a.stack == b.stack)
@@ -20,11 +21,12 @@ impl<'a> PartialEq for DocStepper<'a> {
 }
 
 impl<'a> DocStepper<'a> {
-    pub fn new(span: &DocSpan) -> DocStepper {
+    pub fn new<'b>(span: &'b [DocElement]) -> DocStepper<'b> {
         let mut stepper = DocStepper {
             char_cursor: None,
-            stack: vec![(0, span)],
+            stack: Vec::with_capacity(8),
         };
+        stepper.stack.push((0, span));
         stepper.char_cursor_update();
         stepper
     }
@@ -37,7 +39,7 @@ impl<'a> DocStepper<'a> {
     //TODO pub(crate) plz?
     pub fn char_cursor_update(&mut self) { 
         let cursor = if let Some(&DocChars(ref text)) = self.head_raw() {
-            Some(CharCursor::from_docstring(text))
+            self.cursor.update_from_docstring(text);
         } else {
             None
         };
@@ -81,11 +83,19 @@ impl<'a> DocStepper<'a> {
             .value_sub(sub);
     }
 
+    // TODO hack around lifetime woes? in walkers.rs:to_writer
+    pub unsafe fn raw_index(&self) -> (Option<usize>, Vec<isize>) {
+        (
+            self.char_cursor.as_ref().map(|cc| cc.value()),
+            self.stack.iter().map(|(x, ..)| *x).collect::<Vec<_>>(),
+        )
+    }
+
     // Current row in the stack is a DocSpan reference and an index.
     // What DocElement the index points to is the "head". If the head points
     // to a DocChars, we also create a char_cursor to index into the string.
 
-    pub(crate) fn current(&'a self) -> &(isize, &'a [DocElement]) {
+    pub(crate) fn current<'h>(&'h self) -> &'h (isize, &'a [DocElement]) {
         self.stack.last().unwrap()
     }
 
@@ -103,11 +113,11 @@ impl<'a> DocStepper<'a> {
         self.char_cursor_update();
     }
 
-    pub(crate) fn head_raw(&'a self) -> Option<&'a DocElement> {
+    pub(crate) fn head_raw<'h>(&'h self) -> Option<&'a DocElement> {
         self.current().1.get(self.head_index())
     }
 
-    pub(crate) fn unhead_raw(&'a self) -> Option<&'a DocElement> {
+    pub(crate) fn unhead_raw<'h>(&'h self) -> Option<&'a DocElement> {
         // If we've split a string, don't modify the index.
         if self.char_cursor.as_ref()
             .map(|c| c.value() > 0)
@@ -122,7 +132,8 @@ impl<'a> DocStepper<'a> {
 
     pub fn next(&mut self) {
         self.head_index_add(1);
-        self.char_cursor_update();
+        // TODO @aggressive_opt this is called in head_index_add, right?
+        // self.char_cursor_update();
     }
 
     pub fn prev(&mut self) {
@@ -130,30 +141,27 @@ impl<'a> DocStepper<'a> {
         self.char_cursor_update_prev();
     }
 
-    pub fn head(&self) -> Option<DocElement> {
+    pub fn head<'h>(&'h self) -> Option<&'h DocElement> {
         match self.head_raw() {
             Some(&DocChars(ref text)) => {
                 // Expect cursor is at a string of length 1 at least
                 // (meaning cursor has not passed to the end of the string)
-                Some(DocChars(self.char_cursor_expect().right()
-                    .expect("Encountered empty DocString").clone()))
+                Some(self.char_cursor_expect().right_element().expect("Encountered empty DocString"))
             }
-            Some(value) => Some(value.clone()),
+            Some(ref value) => Some(value),
             None => None,
         }
     }
 
-    pub fn unhead(&self) -> Option<DocElement> {
-        if let Some(&DocChars(ref text)) = self.head_raw() {
+    pub fn unhead<'h>(&'h self) -> Option<&'h DocElement> {
+        if let Some(&DocChars(..)) = self.head_raw() {
             // .left may be empty, so allow fall-through (don't .unwrap())
-            if let Some(docstring) = self.char_cursor_expect().left() {
-                return Some(DocChars(docstring.clone()));
+            if let Some(docstring) = self.char_cursor_expect().left_element() {
+                return Some(docstring);
             }
         }
 
-        self.current().1
-            .get((self.head_index() - 1) as usize)
-            .map(|value| value.clone())
+        self.current().1.get((self.head_index() - 1) as usize)
     }
 
     pub fn peek(&self) -> Option<DocElement> {
@@ -254,8 +262,8 @@ impl<'a> DocStepper<'a> {
     }
 
     pub fn enter(&mut self) -> &mut Self {
-        let index = self.stack.last().unwrap().0 as usize;
-        if let &DocGroup(_, ref inner) = &self.stack.last().unwrap().1[index] {
+        let index = self.stack.last().map(|x| x.0 as usize).unwrap();
+        if let &DocGroup(_, ref inner) = self.stack.last().map(|x| &x.1[index]).unwrap() {
             self.stack.push((0, inner));
         } else {
             panic!("DocStepper::enter() called on inappropriate element");

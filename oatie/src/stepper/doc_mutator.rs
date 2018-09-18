@@ -104,7 +104,7 @@ pub trait Mutator {
 }
 
 impl<'a> DocMutator<'a> {
-    pub fn stepper(&self) -> &DocStepper {
+    pub fn stepper(&'a self) -> &'a DocStepper {
         &self.stepper
     }
 
